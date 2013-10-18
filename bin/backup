@@ -13,40 +13,6 @@ function die {
     exit 1
 }
 
-notify "Running backup"
-
-if [ -e $HOME/.backup/lock ]; then
-    notify "ERROR: Backup already running"
-    echo "ERROR: Backup already running"
-    exit 1
-fi
-
-touch $HOME/.backup/lock
-
-[ ! -f $HOME/.backup/config ] && die "Config file must be in $HOME/.backup/config"
-
-. $HOME/.backup/config
-
-ssh $backup_host <<EOF
-    mkdir -p $remote_path &&
-    cd $remote_path &&
-    ln -sf ./hourly.$hourly_snapshots ./daily.0 &&
-    ln -sf ./daily.$daily_snapshots ./weekly.0 &&
-    ln -sf ./weekly.$weekly_snapshots ./monthly.0
-EOF
-
-[ $? == 0 ] || die "Failed creating target path"
-
-rsync -azP \
-    --delete \
-    --delete-excluded \
-    --exclude-from=$HOME/.backup/exclude \
-    --link-dest=../hourly.1 \
-    $backup_root \
-    $backup_host:$remote_path/hourly.0;
-
-[ $? == 0 ] || die "rsync failed"
-
 function rotate_snapshots {
   local interval=$1
   local snapshot_var=${interval}_snapshots
@@ -82,6 +48,40 @@ function test_age() {
     echo "$interval age is $age / $max_age"
     test $age -gt $max_age
 }
+
+notify "Running backup"
+
+if [ -e $HOME/.backup/lock ]; then
+    notify "ERROR: Backup already running"
+    echo "ERROR: Backup already running"
+    exit 1
+fi
+
+touch $HOME/.backup/lock
+
+[ ! -f $HOME/.backup/config ] && die "Config file must be in $HOME/.backup/config"
+
+. $HOME/.backup/config
+
+ssh $backup_host <<EOF
+    mkdir -p $remote_path &&
+    cd $remote_path &&
+    ln -sf ./hourly.$hourly_snapshots ./daily.0 &&
+    ln -sf ./daily.$daily_snapshots ./weekly.0 &&
+    ln -sf ./weekly.$weekly_snapshots ./monthly.0
+EOF
+
+[ $? == 0 ] || die "Failed creating target path"
+
+rsync -azP \
+    --delete \
+    --delete-excluded \
+    --exclude-from=$HOME/.backup/exclude \
+    --link-dest=../hourly.1 \
+    $backup_root \
+    $backup_host:$remote_path/hourly.0;
+
+[ $? == 0 ] || die "rsync failed"
 
 rotate_snapshots hourly
 test_age daily $(( 24*60*60 )) && rotate_snapshots daily
