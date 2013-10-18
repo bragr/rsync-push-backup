@@ -66,7 +66,6 @@ touch $HOME/.backup/lock
 ssh $backup_host <<EOF
     mkdir -p $remote_path &&
     cd $remote_path &&
-    ln -sf ./hourly.$hourly_snapshots ./daily.0 &&
     ln -sf ./daily.$daily_snapshots ./weekly.0 &&
     ln -sf ./weekly.$weekly_snapshots ./monthly.0
 EOF
@@ -77,14 +76,13 @@ rsync -azP \
     --delete \
     --delete-excluded \
     --exclude-from=$HOME/.backup/exclude \
-    --link-dest=../hourly.1 \
+    --link-dest=../daily.1 \
     $backup_root \
-    $backup_host:$remote_path/hourly.0;
+    $backup_host:$remote_path/daily.0;
 
 [ $? == 0 ] || die "rsync failed"
 
-rotate_snapshots hourly
-test_age daily $(( 24*60*60 )) && rotate_snapshots daily
+rotate_snapshots daily
 test_age weekly $(( 7*24*60*60 )) && rotate_snapshots weekly
 test_age monthly $(( 30*7*24*60*60 )) && rotate_snapshots monthly
 
